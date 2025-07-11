@@ -7,7 +7,7 @@ if [ -z "$TARGET" ]; then
 fi
 
 # Directories
-RESULTS_DIR="$HOME/BugBounty-v1/results/$TARGET"
+RESULTS_DIR="$HOME/recon/$TARGET"
 SUBS_DIR="$RESULTS_DIR/subdomains"
 LIVE_DIR="$RESULTS_DIR/live"
 OUTPUT_DIR="$RESULTS_DIR/output"
@@ -16,8 +16,9 @@ KATANA_DIR="$OUTPUT_DIR/katana"
 HAKRAWLER_DIR="$OUTPUT_DIR/hakrawler"
 TRUFFLEHOG_DIR="$OUTPUT_DIR/trufflehog"
 NUCLEI_DIR="$OUTPUT_DIR/nuclei"
+DNSX_DIR="$OUTPUT_DIR/dnsx"
 
-mkdir -p "$SUBS_DIR" "$LIVE_DIR" "$OUTPUT_DIR" "$GF_DIR" "$KATANA_DIR" "$HAKRAWLER_DIR" "$TRUFFLEHOG_DIR" "$NUCLEI_DIR"
+mkdir -p "$SUBS_DIR" "$LIVE_DIR" "$OUTPUT_DIR" "$GF_DIR" "$KATANA_DIR" "$HAKRAWLER_DIR" "$TRUFFLEHOG_DIR" "$NUCLEI_DIR" "$DNSX_DIR"
 
 echo "[*] Recon started for $TARGET"
 
@@ -32,7 +33,7 @@ if [ ! -s "$SUBS_DIR/subs.txt" ]; then
   echo "[*] Running amass..."
   amass enum -passive -d "$TARGET" > "$SUBS_DIR/amass.txt"
 
-  # Chaos (if API key exists)
+  # Chaos
   if [ -f "$HOME/.config/chaos/config.yaml" ]; then
     echo "[*] Running chaos..."
     chaos -d "$TARGET" -silent -o "$SUBS_DIR/chaos.txt"
@@ -40,7 +41,7 @@ if [ ! -s "$SUBS_DIR/subs.txt" ]; then
     echo "[!] Chaos config not found. Skipping chaos."
   fi
 
-  # Findomain (if installed)
+  # Findomain
   if command -v findomain &> /dev/null; then
     echo "[*] Running findomain..."
     findomain -t "$TARGET" -q > "$SUBS_DIR/findomain.txt"
@@ -48,7 +49,6 @@ if [ ! -s "$SUBS_DIR/subs.txt" ]; then
     echo "[!] Findomain not found. Skipping findomain."
   fi
 
-  # Merge & deduplicate
   cat "$SUBS_DIR"/*.txt | sort -u > "$SUBS_DIR/subs.txt"
 fi
 
@@ -58,7 +58,7 @@ if [ ! -s "$LIVE_DIR/live.txt" ]; then
   cat "$SUBS_DIR/subs.txt" | httpx -silent > "$LIVE_DIR/live.txt"
 fi
 
-### Collect URLs ###
+### URL Collection ###
 if [ ! -s "$OUTPUT_DIR/gau.txt" ]; then
   echo "[*] Running gau..."
   cat "$LIVE_DIR/live.txt" | sed 's|^https\?://||' | gau > "$OUTPUT_DIR/gau.txt"
@@ -78,6 +78,12 @@ fi
 if [ ! -s "$HAKRAWLER_DIR/hakrawler.txt" ]; then
   echo "[*] Running hakrawler..."
   cat "$LIVE_DIR/live.txt" | hakrawler -d 2 -u -subs > "$HAKRAWLER_DIR/hakrawler.txt"
+fi
+
+### DNSX ###
+if [ ! -s "$DNSX_DIR/dnsx.txt" ]; then
+  echo "[*] Running dnsx..."
+  cat "$SUBS_DIR/subs.txt" | dnsx -silent -a -aaaa -cname -ns -mx -ptr -txt > "$DNSX_DIR/dnsx.txt"
 fi
 
 ### Vulnerability Scanning ###
